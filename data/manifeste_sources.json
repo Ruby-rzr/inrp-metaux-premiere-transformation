@@ -1,0 +1,32 @@
+{
+  "rejets": {
+    "fichier": "NPRI-INRP_ReleasesRejets_1993-present.csv",
+    "octets": 393281064,
+    "sha256": "421a7e7356916fb5d3901e11587d5d8ca7316756191038aa5987a3a80fb9d898",
+    "archive_le": "2026-09-17T17:26:26+00:00"
+  },
+  "eliminations": {
+    "fichier": "NPRI-INRP_DisposalsEliminations_1993-present.csv",
+    "octets": 52748777,
+    "sha256": "70b19f9a268bfd794176b38f71153e16473c316a7ce1b590a3fd71cd68791f6d",
+    "archive_le": "2026-09-17T17:26:26+00:00"
+  },
+  "transferts": {
+    "fichier": "NPRI-INRP_DisposalsEliminations_TransfersTransferts_1993-present.csv",
+    "octets": 75442870,
+    "sha256": "073bcdb70917a54d8716c2a9bb076fa9060a2970b4cec09ad15a8a09099103df",
+    "archive_le": "2026-09-17T17:26:26+00:00"
+  },
+  "geo": {
+    "fichier": "NPRI-INRP_GeolocationsGeolocalisation_1993-present.csv",
+    "octets": 13651974,
+    "sha256": "2dcb73082aac50a95446600e1e86b28aec2c48da502265002c05176af4be8781",
+    "archive_le": "2026-09-17T17:26:26+00:00"
+  },
+  "commentaires": {
+    "fichier": "NPRI-INRP_CommentsCommentaires_1997-present.csv",
+    "octets": 163830689,
+    "sha256": "7925a88777c4e78722653597b079ba2ffe88ff506983c1053b0d5070867211a6",
+    "archive_le": "2026-09-17T17:26:26+00:00"
+  }
+}
