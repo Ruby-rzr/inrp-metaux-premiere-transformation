@@ -1,6 +1,6 @@
 {
   "regle": "Installations de SCIAN commencant par 331, situees a moins de 50.0 km de (45.6166, -72.9569), classees par masse totale de metaux rejetee sur 2010-2012, 5 premieres retenues.",
-  "fige_le": "2026-09-17T17:26:35+00:00",
+  "fige_le": "2026-09-17T17:56:44+00:00",
   "retenues": [
     {
       "npri_id": 2986,
@@ -25,14 +25,14 @@
     },
     {
       "npri_id": 959,
-      "nom": "Usine de coulée continue de Montréal-Est",
+      "nom": "Usine de coulÃ©e continue de MontrÃ©al-Est",
       "scian": "331420",
       "rejets_kg_reference": 26130.0,
       "distance_km": 43.3
     },
     {
       "npri_id": 3812,
-      "nom": "Sivaco Québec",
+      "nom": "Sivaco QuÃ©bec",
       "scian": "331222",
       "rejets_kg_reference": 7671.4,
       "distance_km": 26.5
@@ -51,7 +51,7 @@
     },
     {
       "npri_id": 158,
-      "nom": "Usine St-Léonard",
+      "nom": "Usine St-LÃ©onard",
       "rejets_kg_reference": 37.1
     }
   ]
