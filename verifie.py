@@ -128,12 +128,39 @@ print(f"dominante fenetre apres : {dom_ap}")
 print(f"codes presents apres    : {liste_ap}")
 
 print(f"\n=== 5. COMMENTAIRES DE L'EXPLOITANT, code {code}, {annee - 2} a {annee + 2}")
-C = inrp.charger_commentaires({npri_id}, metal=metal)
+C2 = inrp.charger_commentaires({npri_id})
+C = C2[C2["code"] == code]
 C = C[C["annee"].between(annee - 2, annee + 2)].sort_values(["annee", "type"])
 if C.empty:
     print("aucun commentaire pour ce code sur la fenetre")
 for t in C.itertuples():
     print(f"{t.annee} | {t.type} | {t.commentaire}")
+
+print(f"\n=== 5 bis. AUTRES COMMENTAIRES DE L'INSTALLATION, {annee - 2} a {annee + 2}")
+print("Les commentaires sont rattaches a un code de substance. Un enonce qui")
+print("porte sur toute l'installation, une reevaluation de facteurs d'emission")
+print("ou une nouvelle campagne d'echantillonnage par exemple, n'est rattache")
+print("qu'a certains codes, souvent les matieres particulaires NA - M08, M09 et")
+print("M10, qui portent les poussieres dans lesquelles les metaux sont emis.")
+print("Filtrer sur le seul code du metal teste rend ces enonces invisibles.")
+T = inrp.charger_commentaires({npri_id})
+T = T[T["annee"].between(annee - 2, annee + 2) & (T["code"] != code)]
+T = T.drop_duplicates(["annee", "type", "commentaire"]).sort_values(["annee", "type"])
+if T.empty:
+    print("\naucun autre commentaire sur la fenetre")
+for t in T.itertuples():
+    codes = sorted(
+        set(
+            C2.loc[
+                (C2["annee"] == t.annee)
+                & (C2["type"] == t.type)
+                & (C2["commentaire"] == t.commentaire),
+                "code",
+            ].astype(str)
+        )
+    )
+    print(f"{t.annee} | {t.type} | codes {', '.join(codes)}")
+    print(f"        {t.commentaire}")
 
 print("\n=== 6. INSTALLATIONS LIEES DU MEME EXPLOITANT, meme metal, kg")
 print("Comparaison restreinte au perimetre de la selection figee.")
