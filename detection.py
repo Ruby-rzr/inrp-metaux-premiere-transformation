@@ -33,7 +33,9 @@ ABSENCE_MIN = 2   # annees consecutives sans declaration valant arret de declara
 JUSTIFICATION = (
     "Fenetre de 3 ans de part et d'autre : c'est le minimum permettant de "
     "distinguer un changement de niveau persistant d'une annee atypique, tout "
-    "en laissant une plage de detection de 2013 a 2021 sur la serie 2010-2024. "
+    "en laissant une plage de detection de 2013 a 2022 sur la serie 2010-2024, "
+    "soit toute annee t pour laquelle les deux fenetres [t-3, t-1] et [t, t+2] "
+    "sont completes. "
     "Facteur 2 : les variations annuelles de production induisent couramment "
     "des ecarts de 20 a 50 pour cent, un doublement ou une division par deux du "
     "niveau median est rare sans cause identifiable. Plancher de 100 kg : en "
@@ -43,8 +45,42 @@ JUSTIFICATION = (
 )
 
 
+# Journal des revisions du document de regle. Toute entree indique si les
+# parametres de detection eux-memes ont change. Une revision de texte ne
+# remet pas en cause l'anteriorite du gel, une revision de parametres oui.
+REVISIONS = [
+    {
+        "le": "2026-09-17",
+        "objet": (
+            "Correction du texte de la justification. Il annoncait une plage de "
+            "detection de 2013 a 2021 alors que la regle implementee teste 2013 "
+            "a 2022. Le code est la reference, le texte etait faux d'une annee. "
+            "La plage est desormais enoncee de facon derivable des parametres, "
+            "toute annee t dont les deux fenetres sont completes."
+        ),
+        "parametres_modifies": False,
+    },
+]
+
+# Parametres dont la modification invalide l'anteriorite du gel.
+_CLES_PARAMETRES = (
+    "fenetre_annees",
+    "facteur_rupture",
+    "plancher_kg",
+    "absence_min_annees",
+    "serie_de_base",
+)
+
+
 def ecrire_regle() -> dict:
-    """Archive la regle de detection avant de l'appliquer."""
+    """Archive la regle de detection avant de l'appliquer.
+
+    La date de gel est celle du premier archivage et n'est pas reecrite tant
+    que les parametres de detection sont inchanges. Une reexecution du
+    pipeline ne doit pas pouvoir deplacer la date censee etablir que la regle
+    etait fixee avant l'analyse. Un changement de parametre, lui, leve une
+    erreur : il doit passer par une entree de REVISIONS.
+    """
     d = {
         "fenetre_annees": FENETRE,
         "facteur_rupture": FACTEUR,
@@ -52,8 +88,21 @@ def ecrire_regle() -> dict:
         "absence_min_annees": ABSENCE_MIN,
         "serie_de_base": "rejets, tous milieux confondus, par installation et par metal",
         "justification": JUSTIFICATION,
-        "fixee_le": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
+    fixee_le = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    if REGLE.exists():
+        ancien = json.loads(REGLE.read_text(encoding="utf-8"))
+        ecarts = [k for k in _CLES_PARAMETRES if ancien.get(k) != d[k]]
+        if ecarts and not any(r["parametres_modifies"] for r in REVISIONS):
+            raise RuntimeError(
+                "Les parametres de detection ont change sans revision declaree : "
+                f"{ecarts}. Ajouter une entree a REVISIONS avec "
+                "parametres_modifies a True, ou retablir les parametres."
+            )
+        if not ecarts:
+            fixee_le = ancien.get("fixee_le", fixee_le)
+    d["fixee_le"] = fixee_le
+    d["revisions"] = REVISIONS
     REGLE.parent.mkdir(parents=True, exist_ok=True)
     REGLE.write_text(json.dumps(d, indent=2, ensure_ascii=False), encoding="utf-8")
     return d
