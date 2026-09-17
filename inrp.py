@@ -271,3 +271,21 @@ def figer_selection(D: pd.DataFrame, proches: pd.DataFrame) -> dict:
         json.dumps(resultat, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     return resultat
+
+def charger_commentaires(ids=None):
+    """Commentaires des exploitants. Encodage distinct des autres fichiers."""
+    C = pd.read_csv(
+        DATA / FICHIERS["commentaires"], encoding="latin-1", low_memory=False
+    )
+    C = C.rename(
+        columns={
+            COL["annee"]: "annee",
+            COL["id"]: "id",
+            COL["substance"]: "substance",
+            "Comment_Type_Name (French) Type_de_commentaire (Français)": "type",
+            "Comment / Commentaires": "commentaire",
+        }
+    )
+    if ids is not None:
+        C = C[C["id"].isin(ids)]
+    return C[["annee", "id", "substance", "type", "commentaire"]]
