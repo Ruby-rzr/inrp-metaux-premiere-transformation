@@ -78,6 +78,13 @@ METAUX = {
 #             couvre donc pas cette entree, c'est une limite a enoncer.
 HORS_PERIMETRE = {"NA - 19", "7440-66-6"}
 
+# Correspondance inverse. Toute selection d'un metal, y compris dans le
+# fichier des commentaires, passe par le code et jamais par le nom : les noms
+# de substance varient de graphie et un prefixe de nom est ambigu, "chrom"
+# designe aussi bien le chrome total que le chrome hexavalent, qui est hors
+# perimetre.
+CODE_PAR_METAL = {nom: code for code, nom in METAUX.items()}
+
 # Groupes de rejets. Le quatrieme est un total agrege declare par les
 # installations sous le seuil d'une tonne, sans ventilation par milieu.
 GROUPE_AGREGE = "Total des rejets dans tous les milieux (<1tonne)"
@@ -322,8 +329,12 @@ def figer_selection(
     )
     return resultat
 
-def charger_commentaires(ids=None):
-    """Commentaires des exploitants. Encodage distinct des autres fichiers."""
+def charger_commentaires(ids=None, metal: str | None = None):
+    """Commentaires des exploitants. Encodage distinct des autres fichiers.
+
+    La colonne de code est conservee et sert de cle de selection. Le filtre
+    par metal passe par CODE_PAR_METAL, jamais par le nom de substance.
+    """
     C = pd.read_csv(
         DATA / FICHIERS["commentaires"], encoding="latin-1", low_memory=False
     )
@@ -331,6 +342,7 @@ def charger_commentaires(ids=None):
         columns={
             COL["annee"]: "annee",
             COL["id"]: "id",
+            COL["cas"]: "code",
             COL["substance"]: "substance",
             "Comment_Type_Name (French) Type_de_commentaire (Français)": "type",
             "Comment / Commentaires": "commentaire",
@@ -338,4 +350,11 @@ def charger_commentaires(ids=None):
     )
     if ids is not None:
         C = C[C["id"].isin(ids)]
-    return C[["annee", "id", "substance", "type", "commentaire"]]
+    if metal is not None:
+        if metal not in CODE_PAR_METAL:
+            raise KeyError(
+                f"metal inconnu : {metal!r}. Attendu parmi "
+                f"{sorted(CODE_PAR_METAL)}."
+            )
+        C = C[C["code"] == CODE_PAR_METAL[metal]]
+    return C[["annee", "id", "code", "substance", "type", "commentaire"]]

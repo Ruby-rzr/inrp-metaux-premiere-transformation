@@ -23,9 +23,11 @@ print(d[d["flux"] == "rejets"].groupby(["annee", "groupe"])["kg"].sum().round(1)
 print("\n=== METHODES par annee")
 print(d[d["flux"] == "rejets"].groupby(["annee", "methode"])["kg"].sum().round(1))
 
-print("\n=== COMMENTAIRES DE L'EXPLOITANT")
-C = inrp.charger_commentaires({npri_id})
-C = C[C["annee"].between(annee - 2, annee + 2)]
-C = C[C["substance"].astype(str).str.contains(metal[:5], case=False, na=False)]
+code = inrp.CODE_PAR_METAL[metal]
+print(f"\n=== COMMENTAIRES DE L'EXPLOITANT, code {code}, {annee - 2} a {annee + 2}")
+C = inrp.charger_commentaires({npri_id}, metal=metal)
+C = C[C["annee"].between(annee - 2, annee + 2)].sort_values("annee")
+if C.empty:
+    print("aucun commentaire pour ce code sur la fenetre")
 for r in C.itertuples():
     print(f"{r.annee} | {r.type} | {r.commentaire}")
