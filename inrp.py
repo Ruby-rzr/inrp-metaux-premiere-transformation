@@ -68,10 +68,15 @@ METAUX = {
     "NA - 11": "nickel",
     "NA - 14": "zinc",
 }
-# Tenus hors du total pour eviter le double comptage :
-#   NA - 19   chrome hexavalent, deja compris dans le chrome total
-#   7440-66-6 zinc fumee ou poussiere, entree distincte du zinc et composes
-EXCLUS_DU_TOTAL = {"NA - 19", "7440-66-6"}
+# Codes volontairement absents de METAUX ci-dessus, donc jamais charges. Le
+# filtre isin(METAUX) suffit, il n'y a pas de seconde exclusion a appliquer.
+# Conserves ici pour que le perimetre soit citable dans le rapport :
+#   NA - 19   chrome hexavalent, sous-ensemble du chrome total, son inclusion
+#             compterait deux fois la meme masse
+#   7440-66-6 zinc fumee ou poussiere, entree INRP distincte et non emboitee
+#             dans le zinc et ses composes. La serie zinc de cette analyse ne
+#             couvre donc pas cette entree, c'est une limite a enoncer.
+HORS_PERIMETRE = {"NA - 19", "7440-66-6"}
 
 # Groupes de rejets. Le quatrieme est un total agrege declare par les
 # installations sous le seuil d'une tonne, sans ventilation par milieu.
@@ -121,8 +126,17 @@ def _sha256(chemin: Path) -> str:
     return h.hexdigest()
 
 
-def manifeste_local() -> dict:
-    """Empreinte et horodatage des fichiers presents. A lancer une seule fois."""
+def manifeste_local(revision: bool = False) -> dict:
+    """Empreinte et horodatage des fichiers presents.
+
+    Un manifeste deja ecrit n'est pas reecrit. Sa raison d'etre est d'etablir
+    quelles sources ont servi a l'analyse et depuis quand, un horodatage qui
+    se deplace a chaque execution du pipeline n'etablit rien. Si les
+    empreintes des fichiers presents ne correspondent plus au manifeste, la
+    fonction leve une erreur : ce cas doit etre traite explicitement, pas
+    absorbe par une reecriture. Passer revision=True pour archiver
+    volontairement un nouveau jeu de sources.
+    """
     entrees = {}
     for cle, nom in FICHIERS.items():
         chemin = DATA / nom
@@ -133,6 +147,21 @@ def manifeste_local() -> dict:
                 "sha256": _sha256(chemin),
                 "archive_le": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             }
+    if MANIFESTE.exists() and not revision:
+        ancien = json.loads(MANIFESTE.read_text(encoding="utf-8"))
+        ecarts = [
+            cle
+            for cle in set(ancien) | set(entrees)
+            if ancien.get(cle, {}).get("sha256") != entrees.get(cle, {}).get("sha256")
+        ]
+        if ecarts:
+            raise RuntimeError(
+                "Les sources ne correspondent plus au manifeste archive : "
+                f"{sorted(ecarts)}. Tout resultat deja produit est invalide. "
+                "Relancer avec revision=True seulement apres avoir decide "
+                "d'archiver ce nouveau jeu de sources."
+            )
+        return ancien
     MANIFESTE.parent.mkdir(parents=True, exist_ok=True)
     MANIFESTE.write_text(
         json.dumps(entrees, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -225,12 +254,20 @@ def charger_metaux(ids: set[int] | None = None) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def figer_selection(D: pd.DataFrame, proches: pd.DataFrame) -> dict:
+def figer_selection(
+    D: pd.DataFrame, proches: pd.DataFrame, revision: bool = False
+) -> dict:
     """Applique la regle de selection et archive son resultat.
 
     La regle n'utilise que la fenetre de reference. Aucune donnee posterieure
     a REFERENCE[1] n'intervient dans le choix. Le fichier produit est
     horodate et doit etre versionne avant toute analyse temporelle.
+
+    Une selection deja figee n'est pas reecrite. Le pipeline est donc
+    rejouable sans deplacer la date du gel. Si la regle appliquee aux donnees
+    actuelles ne redonne pas les memes installations, la fonction leve une
+    erreur plutot que d'ecraser le gel. Passer revision=True pour figer
+    volontairement une nouvelle selection, dans un commit qui dit pourquoi.
     """
     scian = proches.set_index(COL_GEO["id"])[COL_GEO["scian"]].astype(str)
     ref = D[(D["annee"].between(*REFERENCE)) & (D["flux"] == "rejets")]
@@ -266,6 +303,19 @@ def figer_selection(D: pd.DataFrame, proches: pd.DataFrame) -> dict:
             for i, v in classement.iloc[N_RETENUES:N_RETENUES + 3].items()
         ],
     }
+    if SELECTION.exists() and not revision:
+        ancien = json.loads(SELECTION.read_text(encoding="utf-8"))
+        ids_anciens = [r["npri_id"] for r in ancien["retenues"]]
+        ids_nouveaux = [r["npri_id"] for r in resultat["retenues"]]
+        if ids_anciens != ids_nouveaux:
+            raise RuntimeError(
+                "La regle de selection ne redonne plus les memes installations. "
+                f"Gel : {ids_anciens}. Recalcul : {ids_nouveaux}. Verifier "
+                "d'abord l'integrite des sources avec verifier_manifeste. "
+                "Relancer avec revision=True seulement apres avoir decide de "
+                "refiger la selection."
+            )
+        return ancien
     SELECTION.parent.mkdir(parents=True, exist_ok=True)
     SELECTION.write_text(
         json.dumps(resultat, indent=2, ensure_ascii=False), encoding="utf-8"
