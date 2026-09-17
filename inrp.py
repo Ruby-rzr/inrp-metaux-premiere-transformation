@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import pickle
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,6 +34,7 @@ DATA = Path("data/brut")
 SORTIES = Path("data/derive")
 MANIFESTE = Path("data/manifeste_sources.json")
 SELECTION = Path("data/selection_figee.json")
+CACHE = Path("data/derive/metaux_tous_declarants.pkl")
 
 FICHIERS = {
     "rejets": "NPRI-INRP_ReleasesRejets_1993-present.csv",
@@ -220,12 +222,53 @@ def installations_dans_rayon(rayon_km: float = RAYON_KM) -> pd.DataFrame:
     return proches.sort_values("distance_km").drop_duplicates(subset=[COL_GEO["id"]])
 
 
-def charger_metaux(ids: set[int] | None = None) -> pd.DataFrame:
+def _cle_cache() -> str:
+    """Empreinte de tout ce dont depend le contenu charge.
+
+    Le manifeste des sources y entre en entier, ainsi que les constantes qui
+    determinent ce qui est lu et comment il est converti. Changer l'une
+    d'elles invalide le cache. Le cache ne dispense pas de lancer
+    verifier_manifeste en debut de session : lui seul compare les empreintes
+    aux fichiers reellement presents sur le disque.
+    """
+    parametres = json.dumps(
+        {
+            "metaux": METAUX,
+            "annees": ANNEES,
+            "vers_kg": VERS_KG,
+            "groupe_agrege": GROUPE_AGREGE,
+            "elimination_miniere": sorted(ELIMINATION_MINIERE),
+            "colonnes": COL,
+        },
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    base = MANIFESTE.read_text(encoding="utf-8") + parametres
+    return hashlib.sha256(base.encode("utf-8")).hexdigest()[:16]
+
+
+def charger_metaux(
+    ids: set[int] | None = None, cache: bool = True
+) -> pd.DataFrame:
     """Les trois flux, metaux seuls, en kilogrammes, empiles et etiquetes.
 
     Les flux ne sont jamais additionnes entre eux ici. La colonne 'flux' est
     conservee pour que toute somme ulterieure soit un choix explicite.
+
+    Le resultat est mis en cache, sans filtre d'installation, sous une cle
+    derivee du manifeste des sources et des constantes de chargement. Les
+    CSV sources font environ 520 Mo, les relire a chaque verification de
+    candidate coute une minute pour un resultat identique. Le cache est un
+    fichier derive, non versionne. Passer cache=False pour forcer la
+    relecture des CSV.
     """
+    if cache and CACHE.exists():
+        with CACHE.open("rb") as f:
+            enveloppe = pickle.load(f)
+        if enveloppe.get("cle") == _cle_cache():
+            D = enveloppe["donnees"]
+            return D if ids is None else D[D["id"].isin(ids)].copy()
+        print("  cache perime, relecture des CSV")
     usecols = [
         COL[k]
         for k in ("annee", "id", "entreprise", "installation", "scian", "cas",
@@ -238,8 +281,6 @@ def charger_metaux(ids: set[int] | None = None) -> pd.DataFrame:
             DATA / FICHIERS[flux], encoding=ENCODAGE, low_memory=False, usecols=usecols
         )
         d = d[d[COL["cas"]].isin(METAUX)]
-        if ids is not None:
-            d = d[d[COL["id"]].isin(ids)]
         d = d.rename(columns={v: k for k, v in COL.items()}).copy()
         d["kg"] = _en_kg(d["quantite"], d["unite"])
         d["metal"] = d["cas"].map(METAUX)
@@ -253,7 +294,11 @@ def charger_metaux(ids: set[int] | None = None) -> pd.DataFrame:
     D["societe"] = D["id"].map(dernier["entreprise"])
     D["agrege_sous_1t"] = D["groupe"].eq(GROUPE_AGREGE)
     D["elimination_miniere"] = D["categorie"].isin(ELIMINATION_MINIERE)
-    return D
+    if cache:
+        CACHE.parent.mkdir(parents=True, exist_ok=True)
+        with CACHE.open("wb") as f:
+            pickle.dump({"cle": _cle_cache(), "donnees": D}, f)
+    return D if ids is None else D[D["id"].isin(ids)].copy()
 
 
 # ---------------------------------------------------------------------------
