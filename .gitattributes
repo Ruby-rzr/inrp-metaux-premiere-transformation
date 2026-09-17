@@ -1,0 +1,9 @@
+# Fins de ligne normalisees en LF dans le depot et dans la copie de travail.
+# Sans cette regle, git sous Windows reintroduit du CRLF et fait apparaitre
+# comme modifies des fichiers dont le contenu est inchange, ce qui rend
+# "git status" inutilisable pour le protocole d'un commit par unite de sens.
+* text=auto eol=lf
+
+# Les CSV sources ne sont pas versionnes, mais si l'un s'y retrouvait par
+# erreur, il ne doit subir aucune conversion : son SHA-256 est une preuve.
+*.csv -text
