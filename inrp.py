@@ -134,13 +134,15 @@ def manifeste_local() -> dict:
                 "archive_le": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             }
     MANIFESTE.parent.mkdir(parents=True, exist_ok=True)
-    MANIFESTE.write_text(json.dumps(entrees, indent=2, ensure_ascii=False))
+    MANIFESTE.write_text(
+        json.dumps(entrees, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     return entrees
 
 
 def verifier_manifeste() -> dict:
     """A lancer au debut de chaque session. MODIFIE invalide tout resultat."""
-    ref = json.loads(MANIFESTE.read_text())
+    ref = json.loads(MANIFESTE.read_text(encoding="utf-8"))
     return {
         cle: (
             "absent"
@@ -151,6 +153,7 @@ def verifier_manifeste() -> dict:
         )
         for cle, e in ref.items()
     }
+    
 
 
 # ---------------------------------------------------------------------------
@@ -264,5 +267,7 @@ def figer_selection(D: pd.DataFrame, proches: pd.DataFrame) -> dict:
         ],
     }
     SELECTION.parent.mkdir(parents=True, exist_ok=True)
-    SELECTION.write_text(json.dumps(resultat, indent=2, ensure_ascii=False))
+    SELECTION.write_text(
+        json.dumps(resultat, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     return resultat

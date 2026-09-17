@@ -55,7 +55,7 @@ def ecrire_regle() -> dict:
         "fixee_le": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     REGLE.parent.mkdir(parents=True, exist_ok=True)
-    REGLE.write_text(json.dumps(d, indent=2, ensure_ascii=False))
+    REGLE.write_text(json.dumps(d, indent=2, ensure_ascii=False), encoding="utf-8")
     return d
 
 

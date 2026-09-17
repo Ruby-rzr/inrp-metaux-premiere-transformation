@@ -5,5 +5,5 @@
   "absence_min_annees": 2,
   "serie_de_base": "rejets, tous milieux confondus, par installation et par metal",
   "justification": "Fenetre de 3 ans de part et d'autre : c'est le minimum permettant de distinguer un changement de niveau persistant d'une annee atypique, tout en laissant une plage de detection de 2013 a 2021 sur la serie 2010-2024. Facteur 2 : les variations annuelles de production induisent couramment des ecarts de 20 a 50 pour cent, un doublement ou une division par deux du niveau median est rare sans cause identifiable. Plancher de 100 kg : en dessous, une variation d'un facteur 2 represente une masse trop faible pour etre distinguee du bruit de declaration et du seuil d'agregation sous une tonne.",
-  "fixee_le": "2026-09-17T17:50:41+00:00"
+  "fixee_le": "2026-09-17T17:55:11+00:00"
 }
