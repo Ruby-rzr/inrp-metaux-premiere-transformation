@@ -13,7 +13,7 @@ D = inrp.charger_metaux(set(proches[inrp.COL_GEO["id"]]))
 noms = D.drop_duplicates("id").set_index("id")["nom"]
 
 S = det.series(D, ids)
-c = det.annoter(det.candidates(S), det.methode_dominante(D), noms)
+c = det.annoter(det.candidates(S), det.masse_par_methode(D), noms)
 a = det.arrets_declaration(S)
 
 c.to_csv("data/derive/candidates.csv", index=False)

@@ -127,10 +127,23 @@ def series(D: pd.DataFrame, ids: list[int], flux: str = "rejets") -> pd.DataFram
     return s.reindex(idx).reset_index()
 
 
+METHODE_ABSENTE = "(methode non renseignee)"
+
+
+def masse_par_methode(D: pd.DataFrame, flux: str = "rejets") -> pd.DataFrame:
+    """Masse declaree par installation, metal, annee et code de methode.
+
+    Une methode non renseignee recoit une etiquette explicite plutot que
+    d'etre ecartee par le groupby : son absence est une information.
+    """
+    d = D[D["flux"] == flux].copy()
+    d["methode"] = d["methode"].fillna(METHODE_ABSENTE)
+    return d.groupby(["id", "metal", "annee", "methode"])["kg"].sum().reset_index()
+
+
 def methode_dominante(D: pd.DataFrame, flux: str = "rejets") -> pd.DataFrame:
     """Methode d'estimation portant la plus grande masse, par couple et par an."""
-    d = D[D["flux"] == flux]
-    g = d.groupby(["id", "metal", "annee", "methode"])["kg"].sum().reset_index()
+    g = masse_par_methode(D, flux)
     return (
         g.sort_values("kg")
         .drop_duplicates(["id", "metal", "annee"], keep="last")
@@ -218,22 +231,67 @@ def arrets_declaration(S: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(out)
 
 
-def annoter(c: pd.DataFrame, meth: pd.DataFrame, noms: pd.Series) -> pd.DataFrame:
-    """Ajoute le nom de l'installation et le changement de methode a la rupture."""
+def _methodes_fenetre(
+    mm: pd.DataFrame, i: int, metal: str, annees
+) -> tuple[str | None, str]:
+    """Methode dominante en masse sur une fenetre, et methodes presentes.
+
+    Renvoie (dominante, liste), la liste etant ordonnee de la methode la plus
+    lourde a la plus legere sur la fenetre. Une liste a plus d'un element
+    signale une transition a l'interieur de la fenetre, que la seule
+    dominante masquerait.
+    """
+    d = mm[
+        (mm["id"] == i) & (mm["metal"] == metal) & (mm["annee"].isin(list(annees)))
+    ]
+    if d.empty:
+        return None, ""
+    par_methode = d.groupby("methode")["kg"].sum()
+    par_methode = par_methode[par_methode > 0].sort_values(ascending=False)
+    if par_methode.empty:
+        return None, ""
+    return par_methode.index[0], " | ".join(par_methode.index)
+
+
+def annoter(c: pd.DataFrame, mm: pd.DataFrame, noms: pd.Series) -> pd.DataFrame:
+    """Ajoute le nom de l'installation et le changement de methode d'estimation.
+
+    Le changement de methode est evalue sur les memes fenetres de FENETRE
+    annees que la detection du niveau, soit [t-FENETRE, t-1] et
+    [t, t+FENETRE-1]. Comparer la seule annee t-1 a la seule annee t, comme
+    le faisait la version precedente, laisse passer un changement survenu
+    ailleurs dans la fenetre alors que la mediane comparee, elle, porte sur
+    toute la fenetre. Le drapeau et la mesure doivent porter sur le meme
+    intervalle, sans quoi le drapeau ne dit rien sur la mesure.
+
+    La dominante en masse peut elle-meme masquer une transition. La colonne
+    methode_mixte_dans_fenetre signale les cas ou une fenetre contient
+    plusieurs codes de methode, et les colonnes methodes_fenetre_* les
+    listent du plus lourd au plus leger.
+    """
     if c.empty:
         return c
     c = c.copy()
     c["installation"] = c["id"].map(noms)
-    m = meth.set_index(["id", "metal", "annee"])["methode_dominante"]
-    c["methode_avant"] = [
-        m.get((r.id, r.metal, r.annee_rupture - 1)) for r in c.itertuples()
-    ]
-    c["methode_apres"] = [
-        m.get((r.id, r.metal, r.annee_rupture)) for r in c.itertuples()
-    ]
+    dom_av, dom_ap, liste_av, liste_ap = [], [], [], []
+    for r in c.itertuples():
+        t = r.annee_rupture
+        d, l = _methodes_fenetre(mm, r.id, r.metal, range(t - FENETRE, t))
+        dom_av.append(d)
+        liste_av.append(l)
+        d, l = _methodes_fenetre(mm, r.id, r.metal, range(t, t + FENETRE))
+        dom_ap.append(d)
+        liste_ap.append(l)
+    c["methode_avant"] = dom_av
+    c["methode_apres"] = dom_ap
+    c["methodes_fenetre_avant"] = liste_av
+    c["methodes_fenetre_apres"] = liste_ap
     c["methode_changee"] = (
         c["methode_avant"].notna()
         & c["methode_apres"].notna()
         & (c["methode_avant"] != c["methode_apres"])
     )
+    c["methode_mixte_dans_fenetre"] = c["methodes_fenetre_avant"].str.contains(
+        " | ", regex=False
+    ) | c["methodes_fenetre_apres"].str.contains(" | ", regex=False)
     return c
